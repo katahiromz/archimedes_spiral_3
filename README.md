@@ -9,36 +9,10 @@ JavaScriptで回転する「アルキメデスのらせん」と目玉を描き�
 ## コード
 
 ```js
-/**
- * 点列を結んで折れ線パスを作成します。
- *
- * 注意: この関数はパスを作るだけで ctx.beginPath()/ctx.stroke()/ctx.fill() は行いません。
- * 呼び出し元で beginPath() を呼び、必要に応じて stroke() / fill() を行ってください。
- *
- * @param {CanvasRenderingContext2D} ctx - 描画先の 2D コンテキスト
- * @param {Array<{x:number,y:number}>} points - 頂点配列（各要素は {x, y}）
- * @param {boolean} [reverse=false] - true の場合は点列を逆順にたどる（パスの開始点は逆順での最初の点となる）
- */
-const drawPolyline = (ctx, points, reverse = false) => {
-    if (reverse) { // 逆順？
-        let i = points.length;
-        while (--i >= 0) {
-            let pt = points[i];
-            if (i == 0)
-                ctx.moveTo(pt.x, pt.y);
-            else
-                ctx.lineTo(pt.x, pt.y);
-        }
-    } else {
-        for (let i = 0; i < points.length; ++i) {
-            let pt = points[i];
-            if (i == 0)
-                ctx.moveTo(pt.x, pt.y);
-            else
-                ctx.lineTo(pt.x, pt.y);
-        }
-    }
-};
+// 目玉の画像
+let eye_img = new Image();
+eye_img.src = "./eye.png";
+...
 
 /**
  * アルキメデスのらせんを使って多重ポリゴン風のフィルを描画します。
@@ -113,6 +87,7 @@ const drawArchimedesSpiral = (ctx, x, y, width, height, a = 6, delta_theta = 0.1
         drawPolyline(ctx, points, true); // 逆順
         ctx.closePath();
         ctx.fill();
+        ctx.stroke();
 
         ctx.restore();
     }
@@ -128,8 +103,11 @@ const draw_0 = (ctx, x, y, width, height) => {
 
     // 画面の大きさを考慮する。
     let minxy = Math.min(width, height), maxxy = Math.max(width, height);
+    let avgxy = (minxy + maxxy) / 2;
 
     // アルキメデスのらせんを描く。数値は微調整する必要がある。
+    ctx.strokeStyle = "gray";
+    ctx.lineWidth = avgxy / 100;
     drawArchimedesSpiral(ctx, 0, 0, width, height, 6, 0.1, 3, -time / 100, "black", "white");
 
     // 座標変換により回転運動をさせる
