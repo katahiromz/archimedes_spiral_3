@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>archimedes_spiral_3</title>
+</head>
+<body>
+    <h1>アルキメデスのらせん 3</h1>
+
+    <canvas id="my-canvas" width="300" height="300"></canvas>
+
+    <script>
+        let canvas = document.getElementById('my-canvas');
+        let ctx = canvas.getContext('2d', { alpha: false });
+        let anime = null; // アニメーション
+        let time = (new Date()).getTime(); // 処理フレームの時刻。
+        
+        // 目玉の画像
+        let eye_img = new Image();
+        eye_img.src = "./eye.png";
+
+        /**
+         * 点列を結んで折れ線パスを作成します。
+         *
+         * 注意: この関数はパスを作るだけで ctx.beginPath()/ctx.stroke()/ctx.fill() は行いません。
+         * 呼び出し元で beginPath() を呼び、必要に応じて stroke() / fill() を行ってください。
+         *
+         * @param {CanvasRenderingContext2D} ctx - 描画先の 2D コンテキスト
+         * @param {Array<{x:number,y:number}>} points - 頂点配列（各要素は {x, y}）
+         * @param {boolean} [reverse=false] - true の場合は点列を逆順にたどる（パスの開始点は逆順での最初の点となる）
+         */
+        const drawPolyline = (ctx, points, reverse = false) => {
+            if (reverse) { // 逆順？
+                let i = points.length;
+                while (--i >= 0) {
+                    let pt = points[i];
+                    if (i == 0)
+                        ctx.moveTo(pt.x, pt.y);
+                    else
+                        ctx.lineTo(pt.x, pt.y);
+                }
+            } else {
+                for (let i = 0; i < points.length; ++i) {
+                    let pt = points[i];
+                    if (i == 0)
+                        ctx.moveTo(pt.x, pt.y);
+                    else
+                        ctx.lineTo(pt.x, pt.y);
+                }
+            }
+        };
+
+        /**
+         * アルキメデスのらせんを使って多重ポリゴン風のフィルを描画します。
+         *
+         * - 指定矩形領域でクリップし、背景を塗り、領域中心を原点にしてらせんを生成します。
+         * - らせんは r = a * theta で生成し、theta を delta_theta ずつ増やして点列を作ります。
+         * - 生成した点列を複製して回転させ、順方向と逆方向のポリラインを組み合わせることで
+         *   ドーナツ状／多重パターンのフィルを作成します。
+         *
+         * 注意:
+         * - この関数は drawPolyline(ctx, points, reverse) を使用します。drawPolyline はパス構築を行いますが
+         *   beginPath()/stroke()/fill() の呼び出しは呼び出し元で行う仕様になっている点に合わせて呼んでいます。
+         *
+         * @param {CanvasRenderingContext2D} ctx - 描画先の 2D コンテキスト
+         * @param {number} x - 描画領域の左上 x 座標
+         * @param {number} y - 描画領域の左上 y 座標
+         * @param {number} width - 描画領域の幅
+         * @param {number} height - 描画領域の高さ
+         * @param {number} [a=6] - らせんのスケール係数（r = a * theta）
+         * @param {number} [delta_theta=0.1] - 角度刻み（ラジアン）。小さいほどスムーズになるが計算量が増える
+         * @param {count} [count=3] - 何回転分描くか
+         * @param {number} [rotation=0] - らせん全体の回転量（ラジアン、各頂点の角度に加算される）
+         * @param {string|CanvasGradient|CanvasPattern} [foreColor="black"] - 塗りつぶし色
+         * @param {string} [bgColor="white"] - 背景色（描画領域を塗りつぶす）
+         */
+        const drawArchimedesSpiral = (ctx, x, y, width, height, a = 6, delta_theta = 0.1, count = 3, rotation = 0, foreColor = "black", bgColor = "white") => {
+            ctx.save();
+
+            // クリッピングする
+            ctx.beginPath();
+            ctx.rect(x, y, width, height);
+            ctx.clip();
+
+            // 背景を塗りつぶす
+            ctx.beginPath();
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(x, y, width, height);
+
+            // 中心点に座標変換する
+            let cx = x + width / 2, cy = y + height / 2;
+            ctx.translate(cx, cy);
+
+            // 画面の大きさを考慮する。
+            let minxy = Math.min(width, height), maxxy = Math.max(width, height);
+
+            // アルキメデスのらせんの曲線を線分で近似し頂点を配列に格納する。
+            let points = []
+            for (let theta = 0; ; theta += delta_theta) {
+                // 公式通り計算する
+                let r = a * theta;
+                if (r >= maxxy * Math.sqrt(2)) {
+                    break; // 半径が大きすぎる場合は打ち切る
+                }
+                // 頂点を計算する
+                let x0 = r * Math.cos(theta + rotation), y0 = r * Math.sin(theta + rotation);
+                points.push({x: x0, y: y0});
+            }
+
+            // 実際にポリゴンを描く
+            ctx.fillStyle = foreColor;
+            ctx.beginPath();
+            const delta_angle = (2 * Math.PI) / count / 2;
+            for (let i = 0; i < count; ++i) {
+                let angle = (i / count) * (2 * Math.PI);
+
+                ctx.save();
+
+                ctx.beginPath();
+                ctx.rotate(angle);
+                drawPolyline(ctx, points); // 正順
+                ctx.rotate(delta_angle);
+                drawPolyline(ctx, points, true); // 逆順
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            ctx.restore();
+        };
+
+        const draw_0 = (ctx, x, y, width, height) => {
+            ctx.save();
+
+            // 中心点
+            let cx = x + width / 2, cy = y + height / 2;
+
+            // 画面の大きさを考慮する。
+            let minxy = Math.min(width, height), maxxy = Math.max(width, height);
+
+            // アルキメデスのらせんを描く。数値は微調整する必要がある。
+            drawArchimedesSpiral(ctx, 0, 0, width, height, 6, 0.1, 3, -time / 100, "black", "white");
+
+            // 座標変換により回転運動をさせる
+            let radius = minxy / 10;
+            let rotation = time / 500;
+            ctx.translate(radius * Math.cos(rotation), radius * Math.sin(rotation));
+
+            // 放射状のグラデーションを作る
+            let rInner = 0, rOuter = minxy / 2;
+            const g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+            g.addColorStop(0, `rgba(0, 0, 0, 100%)`); // 黒
+            g.addColorStop(1, `rgba(0, 0, 0, 0%)`); // 透明の黒
+
+            // 半透明のグラデーション（影）を付ける
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOuter, 0, 2 * Math.PI, false);
+            ctx.fillStyle = g;
+            ctx.fill();
+
+            // 画像を使って目玉を描く
+            if (eye_img.complete) { // 画像読み込み完了？
+                let ex = minxy / 3;
+                let ey = ex / eye_img.width * eye_img.height; // アスペクト比を考慮
+                if (time % 1000 < 100)
+                    ey /= 3; // またたき
+                ctx.drawImage(eye_img, 0, 0, eye_img.width, eye_img.height, cx - ex / 2, cy - ey / 2, ex, ey);
+            }
+
+            ctx.restore();
+        };
+
+        // 描画する関数
+        const render = () => {
+            // キャンバスのサイズ
+            let width = canvas.width, height = canvas.height;
+            // 経過時間を計算
+            let new_time = (new Date()).getTime();
+            let diff_time = (new_time - time) / 1000.0; // 秒単位
+            time = new_time; // 時刻を更新
+
+            // 実際に描画する
+            draw_0(ctx, 0, 0, width, height);
+
+            // 次のアニメーションフレームを要求する
+            if (anime)
+                anime = window.requestAnimationFrame(render);
+        };
+
+        // アニメーションを開始する
+        anime = window.requestAnimationFrame(render);
+    </script>
+</body>
+</html>
